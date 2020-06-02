@@ -7,6 +7,9 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <math.h>
+#include <xmmintrin.h>
+#include <smmintrin.h>
+#include <omp.h>
 
 #if defined(_WIN64)
 #	define STBI_NO_SIMD
@@ -174,38 +177,69 @@ static int process_image( const char* nm )
 	//fprintf( stderr, "pixels per char: %f, kernelsize: %d, out: %dx%d\n", pixels_per_char, kernelsize, outw, outh );
 
 	unsigned char out[ outh ][ outw ][ 4 ];
-	for ( int y=0; y<outh; ++y )
-		for ( int x=0; x<outw; ++x )
-		{
-			const int cx = (int) roundf( pixels_per_char * x );
-			const int cy = (int) roundf( pixels_per_char * y );
-			int acc[4] = {0,0,0,0};
-			int numsamples=0;
-			int sy = cy-kernelradius;
-			sy = sy < 0 ? 0 : sy;
-			int ey = cy+kernelradius;
-			ey = ey >= imh ? imh-1 : ey;
-			int sx = cx-kernelradius;
-			sx = sx < 0 ? 0 : sx;
-			int ex = cx+kernelradius;
-			ex = ex >= imw ? imw-1 : ex;
+	#pragma omp parallel
+	{
+		#pragma omp for
+		for ( int y=0; y<outh; ++y )
+			for ( int x=0; x<outw; ++x )
+			{
+				const int cx = (int) roundf( pixels_per_char * x );
+				const int cy = (int) roundf( pixels_per_char * y );
+				int acc[4] = {0,0,0,0};
+				int numsamples=0;
+				int sy = cy-kernelradius;
+				sy = sy < 0 ? 0 : sy;
+				int ey = cy+kernelradius;
+				ey = ey >= imh ? imh-1 : ey;
+				int sx = cx-kernelradius;
+				sx = sx < 0 ? 0 : sx;
+				int ex = cx+kernelradius;
+				ex = ex >= imw ? imw-1 : ex;
+				for ( int yy = sy; yy <= ey; ++yy )
+					for ( int xx = sx; xx <= ex; ++xx )
+					{
+						unsigned char* reader = data + ( yy * imw * 4 ) + xx * 4;
+						const int a = reader[3];
+						acc[ 0 ] += a * reader[0] / 255;
+						acc[ 1 ] += a * reader[1] / 255;
+						acc[ 2 ] += a * reader[2] / 255;
+						acc[ 3 ] += a;//reader[3];
+						numsamples++;
+					}
+				out[ y ][ x ][ 0 ] = acc[ 0 ] / numsamples;
+				out[ y ][ x ][ 1 ] = acc[ 1 ] / numsamples;
+				out[ y ][ x ][ 2 ] = acc[ 2 ] / numsamples;
+				out[ y ][ x ][ 3 ] = acc[ 3 ] / numsamples;
+				}
+	}
+
+/*
+			__m128 acc128 = _mm_load_ps((float*)acc);
 			for ( int yy = sy; yy <= ey; ++yy )
 				for ( int xx = sx; xx <= ex; ++xx )
 				{
-					unsigned char* reader = data + ( yy * imw * 4 ) + xx * 4;
+					float* reader = (float*)(data + ( yy * imw * 4 ) + xx * 4);
 					const int a = reader[3];
 					acc[ 0 ] += a * reader[0] / 255;
 					acc[ 1 ] += a * reader[1] / 255;
 					acc[ 2 ] += a * reader[2] / 255;
 					acc[ 3 ] += reader[3];
+
+
+					__m128 reader128 = _mm_load_ps(reader);
+					__m128 a128 =
+
+
 					numsamples++;
+
+
 				}
 			out[ y ][ x ][ 0 ] = acc[ 0 ] / numsamples;
 			out[ y ][ x ][ 1 ] = acc[ 1 ] / numsamples;
 			out[ y ][ x ][ 2 ] = acc[ 2 ] / numsamples;
 			out[ y ][ x ][ 3 ] = acc[ 3 ] / numsamples;
 		}
-
+*/
 	stbi_image_free( data );
 	data = 0;
 
@@ -258,4 +292,3 @@ int main( int argc, char* argv[] )
 
 	return 0;
 }
-
