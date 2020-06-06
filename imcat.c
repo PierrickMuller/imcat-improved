@@ -179,7 +179,7 @@ static int process_image( const char* nm )
 	unsigned char out[ outh ][ outw ][ 4 ];
 	#pragma omp parallel
 	{
-		#pragma omp for
+		#pragma omp for collapse(2)
 		for ( int y=0; y<outh; ++y )
 			for ( int x=0; x<outw; ++x )
 			{
@@ -212,34 +212,6 @@ static int process_image( const char* nm )
 				out[ y ][ x ][ 3 ] = acc[ 3 ] / numsamples;
 				}
 	}
-
-/*
-			__m128 acc128 = _mm_load_ps((float*)acc);
-			for ( int yy = sy; yy <= ey; ++yy )
-				for ( int xx = sx; xx <= ex; ++xx )
-				{
-					float* reader = (float*)(data + ( yy * imw * 4 ) + xx * 4);
-					const int a = reader[3];
-					acc[ 0 ] += a * reader[0] / 255;
-					acc[ 1 ] += a * reader[1] / 255;
-					acc[ 2 ] += a * reader[2] / 255;
-					acc[ 3 ] += reader[3];
-
-
-					__m128 reader128 = _mm_load_ps(reader);
-					__m128 a128 =
-
-
-					numsamples++;
-
-
-				}
-			out[ y ][ x ][ 0 ] = acc[ 0 ] / numsamples;
-			out[ y ][ x ][ 1 ] = acc[ 1 ] / numsamples;
-			out[ y ][ x ][ 2 ] = acc[ 2 ] / numsamples;
-			out[ y ][ x ][ 3 ] = acc[ 3 ] / numsamples;
-		}
-*/
 	stbi_image_free( data );
 	data = 0;
 
